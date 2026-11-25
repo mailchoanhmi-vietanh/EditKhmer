@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EditKhmer — Demucs 9h+, Edge-TTS &amp; Video/Audio Studio</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app" class="capcut-shell">
+    <!-- TOP BAR (CapCut style) -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-logo" style="background:transparent; padding:0;">
+          <img src="/favicon.svg" alt="EditKhmer" style="width:26px; height:26px; display:block; border-radius:6px;" />
+        </div>
+        <span class="brand-name">EditKhmer</span>
+        <span class="brand-tag">Demucs 9h+</span>
+        <button id="btn-shortcuts-modal" class="top-ghost-btn" title="Xem danh sách phím tắt">⌨ Phím tắt</button>
+      </div>
+
+      <div class="topbar-center">
+        <span id="project-summary" class="project-summary">Kéo thả file vào Khay Media để bắt đầu</span>
+      </div>
+
+      <div class="topbar-right">
+        <button id="btn-env-status" class="status-pill checking" title="Kiểm tra môi trường AI & FFmpeg">
+          <span class="dot"></span>
+          <span id="env-status-text">Đang kiểm tra...</span>
+        </button>
+        <button id="btn-open-export" class="btn-export-top">Xuất</button>
+      </div>
+    </header>
+
+    <!-- UPPER WORKSPACE: [Media Pool] | [Player Stage] | [Inspector] -->
+    <section class="upper-pane">
+      <!-- LEFT: CAPCUT MEDIA POOL + AI QUEUE -->
+      <aside class="panel media-panel">
+        <div class="panel-tabs">
+          <button class="panel-tab active" data-ptab="media">Media</button>
+          <button class="panel-tab" data-ptab="stickers">
+            Nhãn dán
+            <span id="stickers-badge" class="mini-badge hidden">0</span>
+          </button>
+          <button class="panel-tab" data-ptab="demucs">
+            Tách AI
+            <span id="jobs-badge" class="mini-badge hidden">0</span>
+          </button>
+          <button class="panel-tab" data-ptab="tts">
+            Edge-TTS
+            <span id="tts-badge" class="mini-badge hidden">0</span>
+          </button>
+        </div>
+
+        <!-- Sub-panel 1: Media Pool (CapCut style) -->
+        <div id="ptab-media" class="panel-content active">
+          <div class="media-toolbar">
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button id="btn-import-media" class="btn-import-capcut">
+                <span>＋</span> Nhập
+              </button>
+              <button id="btn-delete-media" class="btn-danger btn-xs hidden" title="Xóa tệp đang chọn (Backspace)">🗑 Xóa</button>
+            </div>
+            <input id="input-import-media" type="file" accept="audio/*,video/*" multiple hidden />
+            <span id="media-count" class="muted-count">0 tệp</span>
+          </div>
+
+          <div id="media-dropzone" class="media-grid-wrap">
+            <div id="media-empty" class="media-empty">
+              <div class="media-empty-icon">＋</div>
+              <div class="media-empty-title">Nhập hoặc kéo thả video / audio vào đây</div>
+              <div class="media-empty-sub">Hỗ trợ file dài tới 9+ tiếng (MP4, MKV, MP3, WAV, FLAC...)</div>
+            </div>
+            <div id="media-grid" class="media-grid hidden"></div>
+            <div id="media-marquee" class="marquee-box hidden"></div>
+          </div>
+        </div>
+
+        <!-- Sub-panel 2: Nhãn dán / Logo Overlay -->
+        <div id="ptab-stickers" class="panel-content">
+          <div class="media-toolbar">
+            <button id="btn-import-sticker" class="btn-import-capcut" type="button">
+              <span>＋</span> Thêm Logo / Ảnh
+            </button>
+            <input id="input-import-sticker" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden />
+            <span id="sticker-count" class="muted-count">0 logo</span>
+          </div>
+
+          <div id="sticker-dropzone" class="media-grid-wrap">
+            <div id="sticker-empty" class="media-empty">
+              <div class="media-empty-icon">🏷️</div>
+              <div class="media-empty-title">Kéo thả Logo / Nhãn dán (PNG, JPG, WEBP)</div>
+              <div class="media-empty-sub">Bấm nút ＋ để đặt lên Video, kéo thả vị trí trực tiếp trên khung hình</div>
+            </div>
+            <div id="sticker-grid" class="media-grid hidden"></div>
+          </div>
+        </div>
+
+        <!-- Sub-panel 3: Demucs AI Settings & Progress Queue -->
+        <div id="ptab-demucs" class="panel-content">
+          <div class="ai-quick-config">
+            <div class="ai-row">
+              <label>Chế độ</label>
+              <select id="sep-stems">
+                <option value="2stems" selected>2 Stems (Giọng + Nhạc)</option>
+                <option value="4stems">4 Stems (Vocals/Drums/Bass/Other)</option>
+              </select>
+            </div>
+            <div class="ai-row">
+              <label>Model</label>
+              <select id="sep-model">
+                <option value="htdemucs" selected>htdemucs (Nhanh, chuẩn)</option>
+                <option value="htdemucs_ft">htdemucs_ft (Chất lượng cao)</option>
+                <option value="mdx_extra_q">mdx_extra_q (Nhẹ VRAM)</option>
+              </select>
+            </div>
+            <div class="ai-row">
+              <label>Chia khúc</label>
+              <select id="sep-chunk">
+                <option value="180">3 phút (VRAM thấp)</option>
+                <option value="300" selected>5 phút (Chuẩn 9 tiếng)</option>
+                <option value="600">10 phút (GPU mạnh)</option>
+              </select>
+            </div>
+            <div class="ai-row">
+              <label>Lưu dạng</label>
+              <select id="sep-format">
+                <option value="mp3" selected>MP3 320k</option>
+                <option value="flac">FLAC</option>
+                <option value="wav">WAV</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="jobs-list" class="jobs-list">
+            <div class="empty-jobs">
+              Bấm nút <b>✨ Tách</b> trên bất kỳ tệp nào trong tab <b>Media</b> để tách giọng. Tự động lưu từng khúc, hỗ trợ Tạm dừng / Chạy tiếp.
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub-panel 4: Edge-TTS (.srt & .txt) -->
+        <div id="ptab-tts" class="panel-content">
+          <div class="tts-config">
+            <div class="tts-file-row">
+              <label id="btn-pick-tts-file" for="input-tts-file" class="btn-import-capcut">📄 Chọn .SRT / .TXT</label>
+              <input id="input-tts-file" type="file" accept=".srt,.txt,text/plain,*/*" style="display:none" />
+              <span id="tts-file-label" class="muted-count">Chưa chọn tệp</span>
+            </div>
+
+            <textarea id="tts-text-input" class="tts-textarea" placeholder="Hoặc kéo thả file .srt / .txt vào đây, hoặc dán trực tiếp nội dung cần đọc..."></textarea>
+
+            <div class="ai-row">
+              <label>Giọng đọc</label>
+              <select id="tts-voice">
+                <option value="vi-VN-HoaiMyNeural" selected>Tiếng Việt — Hoài My (Nữ)</option>
+                <option value="vi-VN-NamMinhNeural">Tiếng Việt — Nam Minh (Nam)</option>
+                <option value="km-KH-SreymomNeural">ភាសាខ្មែរ (Khmer) — Sreymom (Nữ)</option>
+                <option value="km-KH-PisethNeural">ភាសាខ្មែរ (Khmer) — Piseth (Nam)</option>
+                <option value="en-US-JennyNeural">English — Jenny (Female)</option>
+                <option value="en-US-GuyNeural">English — Guy (Male)</option>
+                <option value="zh-CN-XiaoxiaoNeural">中文 — Xiaoxiao</option>
+                <option value="ja-JP-NanamiNeural">日本語 — Nanami</option>
+                <option value="ko-KR-SunHiNeural">한국어 — SunHi</option>
+              </select>
+            </div>
+
+            <div class="ai-quick-config" style="padding: 0; border: none;">
+              <div class="ai-row">
+                <div class="insp-label-row">
+                  <span>Tốc độ (Speed)</span>
+                  <span id="tts-rate-val" class="val-cyan">+0%</span>
+                </div>
+                <input id="tts-rate" type="range" min="-50" max="50" step="5" value="0" style="accent-color: var(--cyan);" />
+              </div>
+              <div class="ai-row">
+                <div class="insp-label-row">
+                  <span>Cao độ (Pitch)</span>
+                  <span id="tts-pitch-val" class="val-cyan">+0Hz</span>
+                </div>
+                <input id="tts-pitch" type="range" min="-30" max="30" step="2" value="0" style="accent-color: var(--cyan);" />
+              </div>
+            </div>
+
+            <div class="tts-action-row">
+              <label class="checkbox-label" title="Nếu câu đọc dài hơn khung giờ SRT thì tự tăng nhẹ tốc độ để không đè lên câu sau">
+                <input id="tts-autofit" type="checkbox" checked />
+                <span>Tự khớp giờ SRT</span>
+              </label>
+              <button id="btn-start-tts" class="btn-cyan btn-xs" type="button">🎙 Tạo giọng đọc</button>
+            </div>
+          </div>
+
+          <div id="tts-jobs-list" class="jobs-list">
+            <div class="empty-jobs">
+              Hỗ trợ file <b>.SRT</b> (khớp chuẩn mốc giờ từng câu) và file <b>.TXT</b> (đọc liền mạch). Chạy xong tự động thêm vào Khay Media.
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- CENTER: VIDEO & AUDIO STAGE / PLAYER -->
+      <section class="panel stage-panel">
+        <div class="panel-header-min">Trình phát</div>
+        <div id="stage-canvas-box" class="stage-canvas-box">
+          <canvas id="stage-meter-canvas"></canvas>
+          <video id="stage-video" class="stage-video hidden" muted playsinline preload="metadata"></video>
+          <div id="stage-overlay-layer" class="stage-overlay-layer"></div>
+          <div class="stage-time-big" id="stage-time-big">00:00:00.0</div>
+          <div class="stage-sub" id="stage-track-info">Chưa có clip trên Timeline</div>
+        </div>
+        <div class="stage-controls">
+          <button id="btn-back-5" class="ctrl-icon" title="Lùi 5 giây (←)">↺ 5s</button>
+          <button id="btn-play" class="ctrl-play" title="Phát / Tạm dừng (Space)">▶</button>
+          <button id="btn-fwd-5" class="ctrl-icon" title="Tới 5 giây (→)">5s ↻</button>
+          <div class="stage-time-pair">
+            <span id="time-current" class="time-cyan">00:00:00</span>
+            <span class="time-sep">/</span>
+            <span id="time-total">00:00:00</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: INSPECTOR (CapCut Details Panel) -->
+      <aside class="panel inspector-panel">
+        <div class="panel-header-min" id="inspector-header-title">Chi tiết</div>
+
+        <div id="inspector-empty" class="inspector-empty-box">
+          <div class="insp-placeholder-title">Chưa chọn đoạn audio / logo</div>
+          <div class="insp-shortcuts-list">
+            <div><kbd>Space</kbd> Phát / Tạm dừng</div>
+            <div><kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> Hoàn tác / Làm lại</div>
+            <div><kbd>I</kbd> hoặc <kbd>Q</kbd> Cắt bỏ phần bên trái</div>
+            <div><kbd>O</kbd> hoặc <kbd>W</kbd> Cắt bỏ phần bên phải</div>
+            <div><kbd>Ctrl+B</kbd> hoặc <kbd>S</kbd> Tách đôi clip</div>
+            <div><kbd>Backspace</kbd> Xóa tệp / clip / vùng bôi đen</div>
+          </div>
+        </div>
+
+        <div id="inspector-body" class="inspector-body hidden">
+          <div class="insp-clip-badge" id="insp-name">Clip name</div>
+
+          <div class="insp-group">
+            <div class="insp-label-row">
+              <span>Âm lượng</span>
+              <span id="insp-vol-val" class="val-cyan">100%</span>
+            </div>
+            <input id="insp-volume" type="range" min="0" max="200" value="100" />
+          </div>
+
+          <div class="insp-group">
+            <div class="insp-label-row">
+              <span>Rõ dần (Fade In)</span>
+              <span id="insp-fi-val">0.0s</span>
+            </div>
+            <input id="insp-fade-in" type="range" min="0" max="15" step="0.1" value="0" />
+          </div>
+
+          <div class="insp-group">
+            <div class="insp-label-row">
+              <span>Mờ dần (Fade Out)</span>
+              <span id="insp-fo-val">0.0s</span>
+            </div>
+            <input id="insp-fade-out" type="range" min="0" max="15" step="0.1" value="0" />
+          </div>
+
+          <div class="insp-group-inline">
+            <label>Vị trí (s)</label>
+            <input id="insp-start" type="number" step="0.1" min="0" />
+          </div>
+
+          <div class="insp-meta-row" id="insp-duration">Độ dài: 00:00:00.0</div>
+
+          <div class="insp-quick-actions">
+            <button id="btn-insp-trim-left" class="btn-soft" title="Phím tắt I">◧ Cắt trái (I)</button>
+            <button id="btn-insp-trim-right" class="btn-soft" title="Phím tắt O">◨ Cắt phải (O)</button>
+            <button id="btn-insp-separate" class="btn-soft btn-full">✨ Tách giọng đoạn gốc này</button>
+          </div>
+        </div>
+
+        <!-- Sticker / Logo Inspector -->
+        <div id="sticker-inspector" class="inspector-body hidden">
+          <div class="insp-clip-badge" id="st-insp-name">Logo</div>
+
+          <div class="insp-group">
+            <div class="insp-label-row">
+              <span>Kích thước Logo</span>
+              <span id="st-insp-size-val" class="val-cyan">18%</span>
+            </div>
+            <input id="st-insp-size" type="range" min="4" max="80" step="1" value="18" />
+          </div>
+
+          <div class="insp-group">
+            <div class="insp-label-row">
+              <span>Độ rõ (Opacity)</span>
+              <span id="st-insp-opacity-val" class="val-cyan">100%</span>
+            </div>
+            <input id="st-insp-opacity" type="range" min="10" max="100" step="5" value="100" />
+          </div>
+
+          <div class="insp-quick-actions">
+            <button id="btn-st-tl" class="btn-soft btn-xs">↖ Góc trái trên</button>
+            <button id="btn-st-tr" class="btn-soft btn-xs">↗ Góc phải trên</button>
+            <button id="btn-st-bl" class="btn-soft btn-xs">↙ Góc trái dưới</button>
+            <button id="btn-st-br" class="btn-soft btn-xs">↘ Góc phải dưới</button>
+            <button id="btn-st-remove" class="btn-danger btn-full">🗑 Gỡ logo khỏi Video</button>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- LOWER WORKSPACE: CAPCUT TIMELINE -->
+    <section class="timeline-section">
+      <!-- Timeline Toolbar (CapCut style: Undo, Redo, Split, Trim Left I, Trim Right O, Delete, Snap, Zoom) -->
+      <div class="timeline-toolbar">
+        <div class="tl-left-tools">
+          <button id="btn-undo" class="tl-btn" title="Hoàn tác (Ctrl+Z)" disabled>↶</button>
+          <button id="btn-redo" class="tl-btn" title="Làm lại (Ctrl+Y / Ctrl+Shift+Z)" disabled>↷</button>
+
+          <div class="tl-sep"></div>
+
+          <button id="btn-split" class="tl-btn" title="Tách đôi tại con trỏ (Ctrl+B hoặc S)">✂ Tách</button>
+          <button id="btn-trim-left" class="tl-btn" title="Cắt bỏ bên trái con trỏ (Phím I hoặc Q)">◧ Cắt trái (I)</button>
+          <button id="btn-trim-right" class="tl-btn" title="Cắt bỏ bên phải con trỏ (Phím O hoặc W)">◨ Cắt phải (O)</button>
+          <button id="btn-duplicate" class="tl-btn" title="Nhân bản clip đang chọn (Ctrl+D)">⧉</button>
+          <button id="btn-delete-clip" class="tl-btn tl-btn-danger" title="Xóa clip (Delete)">🗑</button>
+        </div>
+
+        <div class="tl-right-tools">
+          <button id="btn-snap" class="tl-btn active" title="Bật/tắt Hút nam châm (N)">🧲 Hút</button>
+          <div class="tl-sep"></div>
+          <button id="btn-zoom-fit" class="tl-btn" title="Vừa khung hình (Shift+Z)">⤢ Vừa khung</button>
+          <button id="btn-zoom-out" class="tl-btn" title="Thu nhỏ (Ctrl -)">−</button>
+          <input id="zoom-slider" type="range" min="1" max="100" value="25" />
+          <button id="btn-zoom-in" class="tl-btn" title="Phóng to (Ctrl +)">＋</button>
+        </div>
+      </div>
+
+      <!-- Timeline Tracks + Ruler -->
+      <div id="timeline-dropzone" class="timeline-wrapper">
+        <div class="timeline-header">
+          <div class="track-sidebar-header">Luồng âm thanh</div>
+          <div class="ruler-container">
+            <canvas id="ruler-canvas"></canvas>
+          </div>
+        </div>
+
+        <div class="timeline-body">
+          <div id="track-controls-list" class="track-controls-list"></div>
+          <div id="canvas-scroll-area" class="canvas-scroll-area">
+            <canvas id="timeline-canvas"></canvas>
+          </div>
+        </div>
+
+        <div id="timeline-empty" class="timeline-empty-hint">
+          Bấm nút <b>＋</b> trên tệp ở Khay Media hoặc <b>kéo thả audio trực tiếp vào đây</b>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- MODAL 1: AUTO-SETUP ENVIRONMENT -->
+  <div id="setup-modal" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2>Thiết lập môi trường tự động</h2>
+          <p class="modal-sub">Chỉ cần chạy 1 lần đầu — không cần cài Python hay gõ lệnh.</p>
+        </div>
+        <button id="btn-close-setup" class="tl-btn">✕</button>
+      </div>
+
+      <div class="setup-checklist">
+        <div class="check-item">
+          <span class="check-icon">⚡</span>
+          <div class="check-body">
+            <div class="check-title">Card đồ họa (GPU)</div>
+            <div class="check-desc" id="chk-gpu-desc">Đang kiểm tra...</div>
+          </div>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">🎬</span>
+          <div class="check-body">
+            <div class="check-title">FFmpeg &amp; FFprobe</div>
+            <div class="check-desc">Xử lý cắt ghép &amp; sóng âm file 9 tiếng siêu nhẹ</div>
+          </div>
+          <span class="check-badge" id="chk-ffmpeg-badge">...</span>
+        </div>
+        <div class="check-item">
+          <span class="check-icon">🧠</span>
+          <div class="check-body">
+            <div class="check-title">Demucs AI + PyTorch</div>
+            <div class="check-desc">Tự động chọn CUDA nếu máy có card NVIDIA</div>
+          </div>
+          <span class="check-badge" id="chk-ai-badge">...</span>
+        </div>
+      </div>
+
+      <div id="setup-progress-box" class="setup-progress hidden">
+        <div class="progress-row">
+          <span id="setup-message">Đang chuẩn bị...</span>
+          <span id="setup-pct">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div id="setup-bar-fill" class="progress-fill" style="width: 0%"></div>
+        </div>
+        <pre id="setup-logs" class="setup-logs"></pre>
+      </div>
+
+      <label class="checkbox-label">
+        <input id="chk-force-cpu" type="checkbox" />
+        <span>Cài bản nhẹ CPU (không tải CUDA ~2.5GB)</span>
+      </label>
+
+      <div class="modal-footer">
+        <button id="btn-skip-setup" class="btn-soft">Để sau</button>
+        <button id="btn-cancel-setup" class="btn-danger hidden">Hủy tải</button>
+        <button id="btn-run-setup" class="btn-cyan">Tải &amp; Cài tự động</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: CAPCUT-STYLE EXPORT OPTIONS & PROGRESS -->
+  <div id="export-modal" class="modal-backdrop hidden">
+    <div class="modal-card modal-md">
+      <div class="modal-header">
+        <h2 id="export-modal-title">Xuất âm thanh</h2>
+        <button id="btn-close-export-x" class="tl-btn">✕</button>
+      </div>
+
+      <div id="export-config-view" class="export-form">
+        <div class="exp-field">
+          <label>Tên tệp xuất</label>
+          <input id="export-filename" type="text" value="EditKhmer_Export" />
+        </div>
+
+        <div class="exp-field">
+          <label>Xuất đến (Thư mục lưu)</label>
+          <div class="folder-picker-row">
+            <input id="export-dir" type="text" placeholder="Mặc định: thư mục exports của app" />
+            <button id="btn-pick-export-dir" type="button" class="btn-soft">📂 Chọn thư mục</button>
+          </div>
+        </div>
+
+        <div class="exp-field">
+          <label>Chế độ xuất</label>
+          <div class="export-modes">
+            <label class="mode-card">
+              <input type="radio" name="export-mode" value="mix" checked />
+              <div>
+                <div class="mode-title">Gộp thành 1 file (Mix hoàn chỉnh)</div>
+                <div class="mode-desc">Xuất tất cả các luồng đang bật (tôn trọng Mute/Solo &amp; Volume).</div>
+              </div>
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="export-mode" value="selected_track" />
+              <div>
+                <div class="mode-title">Chỉ xuất 1 luồng đang chọn</div>
+                <div class="mode-desc">Ví dụ: chỉ xuất riêng track Giọng hát (Vocals) đã cắt đoạn thừa.</div>
+              </div>
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="export-mode" value="separate_tracks" />
+              <div>
+                <div class="mode-title">Xuất riêng từng luồng (Multi-track)</div>
+                <div class="mode-desc">Mỗi track sau khi cắt ghép được xuất ra 1 file riêng vào cùng thư mục.</div>
+              </div>
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="export-mode" value="video_mp4" />
+              <div>
+                <div class="mode-title">Xuất Video MP4 hoàn chỉnh (Giữ hình gốc + Tiếng đã edit)</div>
+                <div class="mode-desc">Tùy chọn giữ nguyên nét gốc (xuất siêu nhanh) hoặc chỉnh Độ phân giải &amp; FPS.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div id="export-video-source-wrap" class="exp-video-box hidden">
+          <div class="exp-field">
+            <label>Video gốc từ Khay Media</label>
+            <select id="export-video-source"></select>
+          </div>
+          <div class="exp-two-col">
+            <div class="exp-field">
+              <label>Độ phân giải</label>
+              <select id="export-video-res">
+                <option value="original" selected>Giữ nguyên gốc (Nhanh nhất)</option>
+                <option value="720">720p (HD)</option>
+                <option value="1080">1080p (Full HD)</option>
+                <option value="1440">2K (1440p)</option>
+                <option value="2160">4K (2160p)</option>
+              </select>
+            </div>
+            <div class="exp-field">
+              <label>Tốc độ khung hình (FPS)</label>
+              <select id="export-video-fps">
+                <option value="original" selected>Giữ nguyên gốc</option>
+                <option value="24">24 fps</option>
+                <option value="30">30 fps</option>
+                <option value="60">60 fps</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="export-audio-format-wrap" class="exp-field">
+          <label>Định dạng âm thanh</label>
+          <select id="export-format">
+            <option value="mp3" selected>MP3 320kbps (Nhẹ, tương thích mọi nơi)</option>
+            <option value="flac">FLAC (Không suy hao, gọn hơn WAV)</option>
+            <option value="wav">WAV 16-bit (Chuẩn phòng thu)</option>
+          </select>
+        </div>
+
+        <div class="modal-footer">
+          <button id="btn-cancel-export-cfg" class="btn-soft">Hủy</button>
+          <button id="btn-confirm-export" class="btn-cyan">Xuất ngay</button>
+        </div>
+      </div>
+
+      <div id="export-progress-view" class="hidden">
+        <div class="progress-row">
+          <span id="export-message">Đang khởi tạo FFmpeg...</span>
+          <span id="export-pct">0%</span>
+        </div>
+        <div class="progress-bar" style="margin: 10px 0 12px;">
+          <div id="export-bar-fill" class="progress-fill" style="width: 0%"></div>
+        </div>
+        <div id="export-path-preview" class="export-path hidden"></div>
+        <div class="modal-footer">
+          <button id="btn-open-export-folder" class="btn-cyan hidden">📂 Mở thư mục</button>
+          <button id="btn-close-export-done" class="btn-soft hidden">Đóng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: SHORTCUTS CHEATSHEET -->
+  <div id="shortcuts-modal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <h2>Phím tắt kiểu CapCut</h2>
+        <button id="btn-close-shortcuts" class="tl-btn">✕</button>
+      </div>
+      <div class="shortcuts-table">
+        <div><span>Phát / Tạm dừng</span><kbd>Space</kbd></div>
+        <div><span>Hoàn tác (Undo)</span><kbd>Ctrl + Z</kbd></div>
+        <div><span>Làm lại (Redo)</span><kbd>Ctrl + Y</kbd> / <kbd>Ctrl + Shift + Z</kbd></div>
+        <div><span>Tách đôi clip tại con trỏ</span><kbd>Ctrl + B</kbd> / <kbd>S</kbd></div>
+        <div><span>Cắt bỏ bên trái con trỏ</span><kbd>I</kbd> / <kbd>Q</kbd></div>
+        <div><span>Cắt bỏ bên phải con trỏ</span><kbd>O</kbd> / <kbd>W</kbd></div>
+        <div><span>Xóa đoạn đang chọn</span><kbd>Delete</kbd> / <kbd>Backspace</kbd></div>
+        <div><span>Nhân bản đoạn đang chọn</span><kbd>Ctrl + D</kbd></div>
+        <div><span>Bật / tắt hút nam châm</span><kbd>N</kbd></div>
+        <div><span>Phóng to / Thu nhỏ timeline</span><kbd>Ctrl + Cuộn chuột</kbd></div>
+        <div><span>Vừa khung timeline</span><kbd>Shift + Z</kbd></div>
+        <div><span>Lùi / Tới 5 giây</span><kbd>←</kbd> / <kbd>→</kbd></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: AUTO-UPDATE POPUP -->
+  <div id="update-modal" class="modal-backdrop hidden">
+    <div class="modal-card modal-sm">
+      <div class="modal-header">
+        <div>
+          <h2>Có phiên bản mới!</h2>
+          <p class="modal-sub" id="update-version-label">v1.0.0 → v1.1.0</p>
+        </div>
+        <button id="btn-close-update" class="tl-btn">✕</button>
+      </div>
+      <div id="update-notes" class="setup-logs" style="height: 84px; color: var(--text);"></div>
+      <div id="update-progress-box" class="hidden">
+        <div class="progress-row">
+          <span id="update-message">Đang tải bản cập nhật...</span>
+          <span id="update-pct">0%</span>
+        </div>
+        <div class="progress-bar" style="margin-top: 6px;">
+          <div id="update-bar-fill" class="progress-fill" style="width: 0%"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-later-update" class="btn-soft">Để sau</button>
+        <button id="btn-apply-update" class="btn-cyan">Cập nhật ngay</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
